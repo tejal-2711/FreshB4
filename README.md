@@ -13,3 +13,6 @@ As college students with busy workloads and schedules, managing our groceries is
 ## How we built it
 - We used react-native a full stack mobile application that allows users to upload or capture picture, and view freshness analyses.
 - We leveraged Gemini API to integrate an LLM in our app to perform the freshness analysis, give the user recommendations, and detailed recipes.
+
+## Landing Page:
+https://fresh-b4-landing-page.vercel.app/
