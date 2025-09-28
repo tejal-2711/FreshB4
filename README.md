@@ -8,6 +8,7 @@ As college students with busy workloads and schedules, managing our groceries is
 - Lets users keep track of items in their pantry with associated "days to spoilage", "expiry date", "spoiled status", and a "short description".
 - Users can see their overall pantry health and how many items in their pantry need immediate attention.
 - Users can also get AI generated recipes for utilizing the "urgent items" with detailed description of steps, time it takes, and difficulty level.
+- Let's users store store long term pantry items in a database and feed items into the database right after capturing/uploading images.
 
 ## How we built it
 - We used react-native a full stack mobile application that allows users to upload or capture picture, and view freshness analyses.
