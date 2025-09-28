@@ -11,114 +11,57 @@ import {
   FlatList,
   ScrollView,
   RefreshControl,
+  TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import FoodCard from "../components/FoodCard";
 import NotificationBanner from "../components/NotificationBanner";
 import { notificationService } from "../services/notificationService";
+import { pantryService } from "../services/pantryService";
 import { colors, spacing, typography } from "../styles/colors";
 
 export default function PantryScreen() {
   const [pantryItems, setPantryItems] = useState([]);
   const [notificationData, setNotificationData] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Hardcoded pantry data with realistic items
-  const hardcodedPantryItems = [
-    {
-      id: "1",
-      name: "Bananas",
-      category: "Fruits",
-      days_left: 1,
-      expiryDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-      addedDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      notes: "Getting brown spots - perfect for smoothies or baking",
-    },
-    {
-      id: "2",
-      name: "Spinach",
-      category: "Vegetables",
-      days_left: 1,
-      expiryDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-      addedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      notes: "Still crisp but use soon",
-    },
-    {
-      id: "3",
-      name: "Milk",
-      category: "Dairy",
-      days_left: 2,
-      expiryDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-      addedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      notes: "Organic whole milk",
-    },
-    {
-      id: "4",
-      name: "Bread",
-      category: "Bakery",
-      days_left: 0,
-      expiryDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-      addedDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      notes: "Whole wheat - showing mold spots",
-    },
-    {
-      id: "5",
-      name: "Tomatoes",
-      category: "Vegetables",
-      days_left: 3,
-      expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-      addedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      notes: "Cherry tomatoes - nice and firm",
-    },
-    {
-      id: "6",
-      name: "Chicken Breast",
-      category: "Meat",
-      days_left: 2,
-      expiryDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-      addedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-      notes: "Organic free-range",
-    },
-    {
-      id: "7",
-      name: "Bell Peppers",
-      category: "Vegetables",
-      days_left: 4,
-      expiryDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
-      addedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-      notes: "Red and yellow peppers",
-    },
-    {
-      id: "8",
-      name: "Greek Yogurt",
-      category: "Dairy",
-      days_left: 7,
-      expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      addedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-      notes: "Plain, unsweetened",
-    },
-    {
-      id: "9",
-      name: "Carrots",
-      category: "Vegetables",
-      days_left: 10,
-      expiryDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
-      addedDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      notes: "Baby carrots - still crunchy",
-    },
-    {
-      id: "10",
-      name: "Rice",
-      category: "Grains",
-      days_left: 365,
-      expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-      addedDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      notes: "Jasmine rice - pantry staple",
-    },
-  ];
-
-  // Initialize pantry and notifications on mount
+  // Initialize Firebase real-time listener on mount
   useEffect(() => {
-    loadPantryData();
+    console.log("Setting up Firebase listener for pantry items...");
+    setLoading(true);
+
+    // Subscribe to real-time updates from Firebase
+    const unsubscribe = pantryService.subscribeToItems((items) => {
+      console.log("Received pantry items from Firebase:", items.length);
+
+      // Calculate days_left for each item based on expiry date
+      const itemsWithDaysLeft = items.map((item) => {
+        const daysLeft = Math.ceil(
+          (item.expiryDate - new Date()) / (1000 * 60 * 60 * 24)
+        );
+
+        // Log for debugging
+        console.log(
+          `Item ${item.name}: days_left=${daysLeft}, expiry=${item.expiryDate}`
+        );
+
+        return {
+          ...item,
+          days_left: daysLeft,
+        };
+      });
+
+      setPantryItems(itemsWithDaysLeft);
+      setLoading(false);
+      setRefreshing(false);
+    });
+
+    // Cleanup listener on unmount
+    return () => {
+      console.log("Cleaning up Firebase listener");
+      unsubscribe();
+    };
   }, []);
 
   // Update notifications when pantry changes
@@ -132,21 +75,27 @@ export default function PantryScreen() {
   }, [pantryItems]);
 
   /**
-   * Load pantry data (in real app, this would fetch from storage/API)
-   */
-  const loadPantryData = () => {
-    setPantryItems(hardcodedPantryItems);
-  };
-
-  /**
    * Handle pull to refresh
    */
   const onRefresh = () => {
     setRefreshing(true);
+    // Firebase listener will automatically update the data
+    // Just show the refresh indicator briefly
     setTimeout(() => {
-      loadPantryData();
       setRefreshing(false);
     }, 1000);
+  };
+
+  /**
+   * Seed demo data if pantry is empty
+   */
+  const seedDemoData = async () => {
+    try {
+      console.log("Seeding demo data...");
+      await pantryService.seedDemoData();
+    } catch (error) {
+      console.error("Error seeding demo data:", error);
+    }
   };
 
   /**
@@ -248,16 +197,40 @@ export default function PantryScreen() {
         <View style={styles.pantrySection}>
           <Text style={styles.sectionTitle}>Pantry Items</Text>
           <Text style={styles.sectionSubtitle}>
-            Tap items for more details. Visit the Recipes tab for meal
-            suggestions!
+            {loading
+              ? "Loading pantry data from Firebase..."
+              : pantryItems.length > 0
+              ? "Tap items for more details. Visit the Recipes tab for meal suggestions!"
+              : "Your pantry is empty. Scan some food to get started!"}
           </Text>
-          <FlatList
-            data={pantryItems}
-            renderItem={renderPantryItem}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            showsVerticalScrollIndicator={false}
-          />
+
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loadingText}>Connecting to Firebase...</Text>
+            </View>
+          ) : pantryItems.length > 0 ? (
+            <FlatList
+              data={pantryItems}
+              renderItem={renderPantryItem}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
+            />
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>No items in pantry</Text>
+              <Text style={styles.emptySubtitle}>
+                Scan food with the camera or add some demo data to get started!
+              </Text>
+              <TouchableOpacity
+                style={styles.seedButton}
+                onPress={seedDemoData}
+              >
+                <Text style={styles.seedButtonText}>Add Demo Data</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -320,5 +293,40 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
+  },
+  loadingContainer: {
+    padding: spacing.xl,
+    alignItems: "center",
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+  },
+  emptyContainer: {
+    padding: spacing.xl,
+    alignItems: "center",
+  },
+  emptyTitle: {
+    ...typography.h3,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  emptySubtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginBottom: spacing.lg,
+  },
+  seedButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: 25,
+  },
+  seedButtonText: {
+    ...typography.body,
+    color: "white",
+    fontWeight: "600",
   },
 });

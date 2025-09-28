@@ -17,7 +17,9 @@ import {
 import { Camera } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { geminiService } from "../services/geminiService";
+import { pantryService } from "../services/pantryService";
 import {
   colors,
   spacing,
@@ -33,6 +35,7 @@ export default function FoodScannerScreen() {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const cameraRef = useRef(null);
+  const navigation = useNavigation();
 
   // Request camera permissions on mount and list available models
   React.useEffect(() => {
@@ -120,6 +123,71 @@ export default function FoodScannerScreen() {
     setCapturedImage(null);
     setAnalysisResult(null);
     setShowCamera(false);
+  };
+
+  /**
+   * Add analyzed item to Firebase pantry
+   */
+  const addToPantry = async () => {
+    if (!analysisResult) return;
+
+    try {
+      // Calculate expiry date based on AI analysis
+      const daysLeft =
+        analysisResult.days_left !== undefined &&
+        analysisResult.days_left !== null
+          ? analysisResult.days_left
+          : 7;
+      const expiryDate = new Date(Date.now() + daysLeft * 24 * 60 * 60 * 1000);
+
+      // If AI says it's spoiled (days_left <= 0), set expiry date to past
+      if (daysLeft <= 0) {
+        expiryDate.setTime(
+          Date.now() - Math.abs(daysLeft) * 24 * 60 * 60 * 1000
+        );
+      }
+
+      const pantryItem = {
+        name: analysisResult.food_type || "Unknown Food",
+        category: analysisResult.category || "Other",
+        days_left: daysLeft,
+        expiryDate: expiryDate,
+        notes: analysisResult.recommendation || "",
+        aiAnalysis: analysisResult,
+        imageUrl: capturedImage || null,
+      };
+
+      console.log("Adding item to pantry:", {
+        name: pantryItem.name,
+        days_left: pantryItem.days_left,
+        expiryDate: pantryItem.expiryDate,
+        freshness: analysisResult.freshness,
+        originalAIDaysLeft: analysisResult.days_left,
+      });
+
+      await pantryService.addItem(pantryItem);
+
+      Alert.alert(
+        "Added to Pantry!",
+        `${pantryItem.name} has been added to your pantry.`,
+        [
+          {
+            text: "Scan Another",
+            onPress: resetScanner,
+          },
+          {
+            text: "View Pantry",
+            onPress: () => {
+              resetScanner();
+              navigation.navigate("Pantry");
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error("Error adding to pantry:", error);
+      Alert.alert("Error", "Failed to add item to pantry. Please try again.");
+    }
   };
 
   /**
@@ -369,6 +437,29 @@ export default function FoodScannerScreen() {
               <Text style={styles.detailsText}>{analysisResult.details}</Text>
             </View>
           )}
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.addToPantryButton}
+              onPress={addToPantry}
+            >
+              <Ionicons name="add-circle-outline" size={20} color="white" />
+              <Text style={styles.addToPantryText}>Add to Pantry</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.scanAgainButton}
+              onPress={resetScanner}
+            >
+              <Ionicons
+                name="camera-outline"
+                size={20}
+                color={colors.primary}
+              />
+              <Text style={styles.scanAgainText}>Scan Again</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </ScrollView>
@@ -421,6 +512,7 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     paddingHorizontal: spacing.md,
+    flexDirection: "column",
     gap: spacing.md,
   },
   actionButton: {
@@ -626,5 +718,44 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 50,
     height: 50,
+  },
+//   actionButtons: {
+//     flexDirection: "row",
+//     marginTop: spacing.lg,
+//     gap: spacing.md,
+//   },
+  addToPantryButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.success,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+  },
+  addToPantryText: {
+    ...typography.body,
+    color: "white",
+    fontWeight: "600",
+  },
+  scanAgainButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+  },
+  scanAgainText: {
+    ...typography.body,
+    color: colors.primary,
+    fontWeight: "600",
   },
 });
